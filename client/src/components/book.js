@@ -10,25 +10,17 @@ import {
   Button
 } from "reactstrap";
 
-import Table from "./table";
-
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
-import axios from "axios";
 
 export default props => {
-  const [totalTables, setTotalTables] = useState([]);
-
   // User's selections
   const [selection, setSelection] = useState({
-    table: {
-      name: null,
-      id: null
-    },
-    date: new Date(),
+    date: getToday(),
     time: null,
     duration: null,
-    location: "Any Room",
+    location: null,
+    plan: null,
     size: 0
   });
 
@@ -39,39 +31,50 @@ export default props => {
     email: ""
   });
 
+  // List of available times
+  const [times, setTimes] = useState([0]);
+
   // List of potential locations
-  const [locations] = useState(["Any Room", "Upstairs", "Downstairs"]);
-  const [times] = useState([
-    "9AM",
-    "10AM",
-    "11AM",
-    "12PM",
-    "1PM",
-    "2PM",
-    "3PM",
-    "4PM",
-    "5PM"
-  ]);
+  const [locations] = useState(["Upstairs", "Downstairs(coming soon)"]);
+
+  // List of possible durations
   const [durations] = useState([
-    "0.5 hours",
-    "1.0 hours",
-    "1.5 hours",
-    "2.0 hours",
-    "2.5 hours",
-    "3.0 hours"
+    1, 2, 3
   ])
+
+  // Payment methods
+  const [plans] = useState([
+    "Pay by Hour",
+    "Pay by Headcount"
+  ])
+
+  // Page State
+  const [next, SetNext] = useState(false)
+
   // Basic reservation "validation"
   const [reservationError, setReservationError] = useState(false);
 
-  const getEmptyTables = _ => {
-    let tables = totalTables.filter(table => table.isAvailable);
-    return tables.length;
-  };
+  useEffect(() => {
+    if (selection.duration && selection.date) {
+      (async _ => {
+        setTimes([0])
+        let res = await fetch("http://localhost:3001/days?" 
+          + "date=" + selection.date 
+          + "&size=" + selection.size 
+          + "&duration=" + selection.duration 
+          + "&plan=" + selection.plan);
+        res = await res.json();
+        console.log(res);
+        setTimes(res);
+      })();
+    }
+  }, [selection.duration, selection.date, selection.plan, selection.size, selection.location]);
 
-  useEffect(async () => {
-    const data = (await axios.get("https://8tvebxjc.brev.dev/api/booking")).data
-    console.log(data)
-  },[]);
+  function getToday() {
+    var timestamp = new Date();
+    timestamp.setHours(0, 0, 0, 0);
+    return timestamp
+  }
 
   // Make the reservation if all details are filled out
   const reserve = async _ => {
@@ -83,7 +86,7 @@ export default props => {
       console.log("Incomplete Details");
       setReservationError(true);
     } else {
-      let res = await fetch("http://localhost:3005/reserve", {
+      let res = await fetch("http://localhost:3001/reserve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -91,7 +94,7 @@ export default props => {
         body: JSON.stringify({
           ...booking,
           date: selection.date,
-          table: selection.table.id
+          time: selection.time
         })
       });
       res = await res.text();
@@ -100,22 +103,11 @@ export default props => {
     }
   };
 
-  // Clicking on a table sets the selection state
-  const selectTable = (table_name, table_id) => {
-    setSelection({
-      ...selection,
-      table: {
-        name: table_name,
-        id: table_id
-      }
-    });
-  };
-
   // Generate party size dropdown
   const getSizes = _ => {
     let newSizes = [];
 
-    for (let i = 1; i < 8; i++) {
+    for (let i = 1; i < 16; i++) {
       newSizes.push(
         <DropdownItem
           key={i}
@@ -123,9 +115,6 @@ export default props => {
           onClick={e => {
             let newSel = {
               ...selection,
-              table: {
-                ...selection.table
-              },
               size: i
             };
             setSelection(newSel);
@@ -149,9 +138,6 @@ export default props => {
           onClick={_ => {
             let newSel = {
               ...selection,
-              table: {
-                ...selection.table
-              },
               location: loc
             };
             setSelection(newSel);
@@ -175,9 +161,6 @@ export default props => {
           onClick={_ => {
             let newSel = {
               ...selection,
-              table: {
-                ...selection.table
-              },
               duration: duration
             };
             setSelection(newSel);
@@ -190,75 +173,62 @@ export default props => {
     return newDurations;
   }
 
-  // Generate locations dropdown
+  // Generate times dropdown
   const getTimes = _ => {
     let newTimes = [];
     times.forEach(time => {
       newTimes.push(
-        <DropdownItem
+        <Button
           key={time}
-          className="booking-dropdown-item"
+          className="custom-btn"
           onClick={_ => {
             let newSel = {
               ...selection,
-              table: {
-                ...selection.table
-              },
               time: time
             };
             setSelection(newSel);
           }}
         >
-          {time}
-        </DropdownItem>
+          {(time - 1) % 12 + 1} {time < 12 ? "am" : "pm"}
+        </Button>
       );
     });
     return newTimes;
   };
 
-  // Generating tables from available tables state
-  const getTables = _ => {
-    console.log("Getting tables");
-    if (getEmptyTables() > 0) {
-      let tables = [];
-      totalTables.forEach(table => {
-        if (table.isAvailable) {
-          tables.push(
-            <Table
-              key={table._id}
-              id={table._id}
-              chairs={table.capacity}
-              name={table.name}
-              empty
-              selectTable={selectTable}
-            />
-          );
-        } else {
-          tables.push(
-            <Table
-              key={table._id}
-              id={table._id}
-              chairs={table.capacity}
-              name={table.name}
-              selectTable={selectTable}
-            />
-          );
-        }
-      });
-      return tables;
-    }
+  // Generate locations dropdown
+  const getPlans = _ => {
+    let newPlans = [];
+    plans.forEach(plan => {
+      newPlans.push(
+        <DropdownItem
+          key={plan}
+          className="booking-dropdown-item"
+          onClick={_ => {
+            let newSel = {
+              ...selection,
+              plan: plan
+            };
+            setSelection(newSel);
+          }}
+        >
+          {plan}
+        </DropdownItem>
+      );
+    });
+    return newPlans;
   };
 
   return (
     <div>
-      <Row noGutters className="text-center align-items-center pizza-cta">
+      <Row noGutters className="text-center align-items-center room-cta">
         <Col>
-          <p className="looking-for-pizza">
-            {!selection.table.id ? "Reserve a Room" : "Confirm Reservation"}
+          <p className="looking-for-room">
+            {!next ? "Reserve a Room" : "Confirm Reservation"}
           </p>
-          <p className="selected-table">
-            {selection.table.id
-              ? "You are booking room " + selection.table.name
+          <p className="selected-time">
+            {next
+              ? "You are reserving " + selection.location + " at " + selection.time + " for " + selection.duration + (selection.duration === 1 ? " hour" : " hours") + " on " + selection.date.toString()
               : null}
           </p>
 
@@ -270,23 +240,23 @@ export default props => {
         </Col>
       </Row>
 
-      {!selection.table.id ? (
+      {!next ? (
         <div id="reservation-stuff">
           <Row noGutters className="text-center align-items-center">
           <Col xs="12" sm="3">
               <UncontrolledDropdown>
                 <DropdownToggle color="none" caret className="booking-dropdown">
-                  {selection.location}
+                  {selection.location === null ? "Select a Room" : selection.location}
                 </DropdownToggle>
                 <DropdownMenu right className="booking-dropdown-menu">
                   {getLocations()}
                 </DropdownMenu>
               </UncontrolledDropdown>
             </Col>
-            <Col>
+            <Col xs="12" sm="3">
               <UncontrolledDropdown>
                   <DropdownToggle color="none" caret className="booking-dropdown">
-                    {selection.duration === null ? "Select a Duration" : selection.duration}
+                    {selection.duration === null ? "Select a Duration" : "Duration: " + selection.duration + (selection.duration === 1 ? " Hour": " Hours")}
                   </DropdownToggle>
                   <DropdownMenu right className="booking-dropdown-menu">
                     {getDurations()}
@@ -295,6 +265,7 @@ export default props => {
             </Col>
             <Col xs="12" sm="3">
               <DatePicker 
+              style={{width: "inherit"}}
                 type="date"
                 required="required"
                 className="booking-dropdown"
@@ -302,9 +273,6 @@ export default props => {
                 onChange={ date => { 
                       let newSel = {
                       ...selection,
-                      table: {
-                        ...selection.table
-                      },
                       date: date
                     };
                     setSelection(newSel);
@@ -316,53 +284,62 @@ export default props => {
             <Col xs="12" sm="3">
               <UncontrolledDropdown>
                 <DropdownToggle color="none" caret className="booking-dropdown">
-                  {selection.time === null ? "Select a Time" : selection.time}
+                  {selection.plan === null ? "Select a Payment Plan" : selection.plan}
                 </DropdownToggle>
                 <DropdownMenu right className="booking-dropdown-menu">
-                  {getTimes()}
+                  {getPlans()}
                 </DropdownMenu>
               </UncontrolledDropdown>
             </Col>
             <Col xs="12" sm="3">
-              <UncontrolledDropdown>
-                <DropdownToggle color="none" caret className="booking-dropdown">
-                  {selection.size === 0
-                    ? "Select a Party Size"
-                    : selection.size.toString()}
-                </DropdownToggle>
-                <DropdownMenu right className="booking-dropdown-menu">
-                  {getSizes()}
-                </DropdownMenu>
-              </UncontrolledDropdown>
+              {selection.plan === "Pay by Headcount" ?
+                <UncontrolledDropdown>
+                  <DropdownToggle color="none" caret className="booking-dropdown">
+                    {selection.size === 0
+                      ? "Select a Party Size"
+                      : selection.size.toString()}
+                  </DropdownToggle>
+                  <DropdownMenu right className="booking-dropdown-menu">
+                    {getSizes()}
+                  </DropdownMenu>
+                </UncontrolledDropdown> : ""}
             </Col>
           </Row>
-          <Row noGutters className="tables-display">
+          <Row noGutters className="times-display">
             <Col>
-              {getEmptyTables() > 0 ? (
-                <p className="available-tables">{getEmptyTables()} available</p>
-              ) : null}
-
-              {selection.date && selection.time ? (
-                getEmptyTables() > 0 ? (
+              {selection.location && selection.date && selection.duration && (selection.plan === "Pay by Hour" || selection.size) ? (
+                times.length > 1 ? (
                   <div>
-                    <div className="table-key">
-                      <span className="empty-table"></span> &nbsp; Available
-                      &nbsp;&nbsp;
-                      <span className="full-table"></span> &nbsp; Unavailable
-                      &nbsp;&nbsp;
-                    </div>
-                    <Row noGutters>{getTables()}</Row>
+                    <p className="time-display-message">
+                      Select a Starting Time
+                    </p>
+                    {getTimes()}
                   </div>
                 ) : (
-                  <p className="table-display-message">No Available Tables</p>
+                  <p className="time-display-message">{times.length === 0 ? "No Available Times" : "Loading..."}</p>
                 )
               ) : (
-                <p className="table-display-message">
-                  Please select a date and time for your reservation.
+                <p className="time-display-message">
+                  Please fill out the relevant information for your reservation.
                 </p>
               )}
             </Col>
           </Row>
+          {selection.time ? 
+            <Row noGutters className="text-center">
+              <Col>
+                <Button
+                  color="none"
+                  className="custom-btn"
+                  onClick={_ => {
+                    SetNext(true);
+                  }}
+                >
+                  Next
+                </Button>
+              </Col>
+            </Row>
+          : null}
         </div>
       ) : (
         <div id="confirm-reservation-stuff">
@@ -420,7 +397,7 @@ export default props => {
             <Col>
               <Button
                 color="none"
-                className="book-table-btn"
+                className="custom-btn"
                 onClick={_ => {
                   reserve();
                 }}

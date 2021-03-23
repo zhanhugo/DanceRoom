@@ -4,14 +4,14 @@ import { Row, Col, Button } from "reactstrap";
 export default props => {
   return (
     <div>
-      <Row noGutters className="text-center align-items-center pizza-cta">
+      <Row noGutters className="text-center align-items-center room-cta">
         <Col>
-          <p className="looking-for-pizza">
+          <p className="looking-for-room">
             Professional Dance Studio
           </p>
           <Button
             color="none"
-            className="book-table-btn"
+            className="custom-btn"
             onClick={_ => {
               props.setPage(1);
             }}
