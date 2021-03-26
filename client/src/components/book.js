@@ -21,7 +21,7 @@ export default props => {
     duration: null,
     location: null,
     plan: null,
-    size: 0
+    size: null
   });
 
   // User's booking details
@@ -55,20 +55,19 @@ export default props => {
   const [reservationError, setReservationError] = useState(false);
 
   useEffect(() => {
-    if (selection.duration && selection.date) {
+    if (selection.duration && selection.date && selection.size && selection.location) {
       (async _ => {
         setTimes([0])
         let res = await fetch("http://localhost:3001/days?" 
           + "date=" + selection.date 
           + "&size=" + selection.size 
           + "&duration=" + selection.duration 
-          + "&plan=" + selection.plan);
+        );
         res = await res.json();
-        console.log(res);
         setTimes(res);
       })();
     }
-  }, [selection.duration, selection.date, selection.plan, selection.size, selection.location]);
+  }, [selection.duration, selection.date, selection.size, selection.location]);
 
   function getToday() {
     var timestamp = new Date();
@@ -86,20 +85,35 @@ export default props => {
       console.log("Incomplete Details");
       setReservationError(true);
     } else {
-      let res = await fetch("http://localhost:3001/reserve", {
+      let res = await fetch("http://localhost:3001/days", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          ...booking,
           date: selection.date,
-          time: selection.time
+          size: selection.size, 
+          duration: selection.duration, 
+          start: selection.time
         })
-      });
-      res = await res.text();
-      console.log("Reserved: " + res);
-      props.setPage(2);
+      }).then(props.setPage(2))
+      .then( 
+        await fetch("http://localhost:3001/reserves", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            date: selection.date,
+            size: selection.size, 
+            duration: selection.duration, 
+            start: selection.time,
+            name: booking.name,
+            phone: booking.phone,
+            email: booking.email
+          })
+        })
+      );
     }
   };
 
@@ -107,7 +121,7 @@ export default props => {
   const getSizes = _ => {
     let newSizes = [];
 
-    for (let i = 1; i < 16; i++) {
+    for (let i = 1; i < 7; i++) {
       newSizes.push(
         <DropdownItem
           key={i}
@@ -207,6 +221,7 @@ export default props => {
           onClick={_ => {
             let newSel = {
               ...selection,
+              size: plan === "Pay by Hour" ? 6 : null,
               plan: plan
             };
             setSelection(newSel);
@@ -295,7 +310,7 @@ export default props => {
               {selection.plan === "Pay by Headcount" ?
                 <UncontrolledDropdown>
                   <DropdownToggle color="none" caret className="booking-dropdown">
-                    {selection.size === 0
+                    {!selection.size
                       ? "Select a Party Size"
                       : selection.size.toString()}
                   </DropdownToggle>
@@ -308,7 +323,7 @@ export default props => {
           <Row noGutters className="times-display">
             <Col>
               {selection.location && selection.date && selection.duration && (selection.plan === "Pay by Hour" || selection.size) ? (
-                times.length > 1 ? (
+                selection.location === "Upstairs" && times.length > 1 ? (
                   <div>
                     <p className="time-display-message">
                       Select a Starting Time
@@ -316,7 +331,9 @@ export default props => {
                     {getTimes()}
                   </div>
                 ) : (
-                  <p className="time-display-message">{times.length === 0 ? "No Available Times" : "Loading..."}</p>
+                  <p className="time-display-message">
+                    {selection.location === "Downstairs(coming soon)" || times.length === 0 ? "No Available Times" : "Loading..."}
+                  </p>
                 )
               ) : (
                 <p className="time-display-message">
