@@ -341,7 +341,7 @@ export default props => {
           <Row noGutters className="times-display">
             <Col>
               {selection.location && selection.date && selection.duration && (selection.plan === "Pay by Hour" || selection.size) ? (
-                selection.location === "Upstairs" && times.length > 1 ? (
+                selection.location === "Upstairs" && times.length > 0 && times[0] != 0 ? (
                   <div>
                     <p className="time-display-message">
                       Select a Starting Time
