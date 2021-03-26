@@ -112,8 +112,19 @@ export default props => {
             phone: booking.phone,
             email: booking.email
           })
-        })
-      );
+        }).then(
+          await fetch('http://localhost:3001/sms', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              to: booking.phone,
+              body: getReservations()
+            })
+          })
+        )
+      ); 
     }
   };
 
@@ -234,6 +245,13 @@ export default props => {
     return newPlans;
   };
 
+  const getReservations = _ => {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const date = selection.date.toLocaleDateString("en-US", options);
+    const time = (selection.time % 12) + " " + (selection.time < 12 ? "am" : "pm")
+    return "You are reserving " + selection.location + " at " + time + " for " + selection.duration + (selection.duration === 1 ? " hour" : " hours") + " on " + date
+  }
+
   return (
     <div>
       <Row noGutters className="text-center align-items-center room-cta">
@@ -243,7 +261,7 @@ export default props => {
           </p>
           <p className="selected-time">
             {next
-              ? "You are reserving " + selection.location + " at " + selection.time + " for " + selection.duration + (selection.duration === 1 ? " hour" : " hours") + " on " + selection.date.toString()
+              ? getReservations()
               : null}
           </p>
 

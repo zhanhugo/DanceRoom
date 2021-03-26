@@ -1,6 +1,11 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require('cors');
 const app = express();
+const client = require('twilio')(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 app.use(cors());
 app.use(express.json());
@@ -11,6 +16,7 @@ const ObjectId = require('mongodb').ObjectID;
 let daysDB;
 let reservesDB;
 
+//daysDB
 MongoClient.connect('mongodb://localhost:27017/days', { useUnifiedTopology: true }, async function(err, client) {
     if (err) throw err
 
@@ -38,7 +44,6 @@ app.get('/days', async (req, res) => {
     const {date, size, duration} = req.query;
     const day = await daysDB.collection('days').findOne({ "_id": objectIdWithTimestamp(date) });
     if (day) {
-        console.log(day)
         let times = [];
         var found = 0;
         var i = 0;
@@ -82,7 +87,7 @@ app.post('/days', async (req, res) => {
     }
 })
 
-
+//reservesDB
 MongoClient.connect('mongodb://localhost:27017/reserves', { useUnifiedTopology: true }, async function(err, client) {
     if (err) throw err
     reservesDB = client.db('reserves');
@@ -96,6 +101,25 @@ app.get('/reserves', async (req, res) => {
 
 app.post('/reserves', async (req, res) => {
     await reservesDB.collection('reserves').insertOne(req.body);
+});
+
+//twillio
+app.post('/sms', (req, res) => {
+    console.log(req.body.body)
+    res.header('Content-Type', 'application/json');
+    client.messages
+    .create({
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: req.body.to,
+      body: req.body.body
+    })
+    .then(() => {
+      res.send(JSON.stringify({ success: true }));
+    })
+    .catch(err => {
+      console.log(err);
+      res.send(JSON.stringify({ success: false }));
+    });
 });
 
 app.listen(3001, () => {
