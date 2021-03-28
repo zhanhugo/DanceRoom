@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { Component, useState, useEffect } from "react";
 import {
   Row,
   Col,
@@ -9,9 +9,10 @@ import {
   Input,
   Button
 } from "reactstrap";
+import PayPalBtn from './paypal';
 
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 export default props => {
   // User's selections
@@ -430,7 +431,7 @@ export default props => {
           </Row>
           <Row noGutters className="text-center">
             <Col>
-              <Button
+              {/* <Button
                 color="none"
                 className="custom-btn"
                 onClick={_ => {
@@ -438,7 +439,13 @@ export default props => {
                 }}
               >
                 Book Now
-              </Button>
+              </Button> */}
+              <PayPalBtn
+                    amount = {200}
+                    currency = {'USD'}
+                    onSuccess={_ => {
+                      reserve();
+                    }}/>
             </Col>
           </Row>
         </div>
@@ -446,3 +453,40 @@ export default props => {
     </div>
   );
 };
+
+{/* <div id="smart-button-container">
+      <div style="text-align: center;">
+        <div id="paypal-button-container"></div>
+      </div>
+    </div>
+  <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD" data-sdk-integration-source="button-factory"></script>
+  <script>
+    function initPayPalButton() {
+      paypal.Buttons({
+        style: {
+          shape: 'rect',
+          color: 'gold',
+          layout: 'vertical',
+          label: 'pay',
+          
+        },
+
+        createOrder: function(data, actions) {
+          return actions.order.create({
+            purchase_units: [{"amount":{"currency_code":"USD","value":0.01}}]
+          });
+        },
+
+        onApprove: function(data, actions) {
+          return actions.order.capture().then(function(details) {
+            alert('Transaction completed by ' + details.payer.name.given_name + '!');
+          });
+        },
+
+        onError: function(err) {
+          console.log(err);
+        }
+      }).render('#paypal-button-container');
+    }
+    initPayPalButton();
+  </script> */}
