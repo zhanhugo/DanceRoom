@@ -13,6 +13,7 @@ import PayPalBtn from './paypal';
 
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import emailjs from "emailjs-com"; 
 
 export default props => {
   // User's selections
@@ -23,13 +24,6 @@ export default props => {
     location: null,
     plan: null,
     size: null
-  });
-
-  // User's booking details
-  const [booking, setBooking] = useState({
-    name: "",
-    phone: "",
-    email: ""
   });
 
   // List of available times
@@ -76,12 +70,22 @@ export default props => {
     return timestamp
   }
 
+  function sendEmail(e) {
+    e.preventDefault();
+    console.log(e.target.email.value)
+    
+
+    e.target.reset()
+  }
+
   // Make the reservation if all details are filled out
-  const reserve = async _ => {
+  async function reserve(e) {
+    e.preventDefault();
+    console.log(e.target.phone.value.type)
     if (
-      (booking.name.length === 0) |
-      (booking.phone.length === 0) |
-      (booking.email.length === 0)
+      (e.target.name.value.length === 0) |
+      (e.target.phone.value.length === 0) |
+      (e.target.email.value.length === 0)
     ) {
       console.log("Incomplete Details");
       setReservationError(true);
@@ -109,9 +113,9 @@ export default props => {
             size: selection.size, 
             duration: selection.duration, 
             start: selection.time,
-            name: booking.name,
-            phone: booking.phone,
-            email: booking.email
+            name: e.target.name.value,
+            phone: e.target.phone.value,
+            email: e.target.email.value
           })
         }).then(
           await fetch('http://localhost:3001/sms', {
@@ -120,10 +124,17 @@ export default props => {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              to: booking.phone,
+              to: e.target.phone.value,
               body: getReservations()
             })
-          })
+          }).then(
+            emailjs.sendForm('service_m09cymo', 'template_8j4kqwe', e.target, 'user_1CbHyIpDtnS95rYhItSCi')
+              .then((result) => {
+                  console.log(result.text);
+              }, (error) => {
+                  console.log(error.text);
+              })
+          )
         )
       ); 
     }
@@ -383,63 +394,39 @@ export default props => {
             noGutters
             className="text-center justify-content-center reservation-details-container"
           >
-            <Col xs="12" sm="3" className="reservation-details">
+            <form className = "reservation-details" onSubmit = {reserve}>
+              <Input
+                className = "selected-time"
+                type = "hidden"
+                name = "message"
+                value = {getReservations()}
+              />
               <Input
                 type="text"
                 bsSize="lg"
                 placeholder="Name"
                 className="reservation-input"
-                value={booking.name}
-                onChange={e => {
-                  setBooking({
-                    ...booking,
-                    name: e.target.value
-                  });
-                }}
+                name = "name"
               />
-            </Col>
-            <Col xs="12" sm="3" className="reservation-details">
               <Input
                 type="text"
                 bsSize="lg"
                 placeholder="Phone Number"
                 className="reservation-input"
-                value={booking.phone}
-                onChange={e => {
-                  setBooking({
-                    ...booking,
-                    phone: e.target.value
-                  });
-                }}
+                name = "phone"
               />
-            </Col>
-            <Col xs="12" sm="3" className="reservation-details">
               <Input
                 type="text"
                 bsSize="lg"
                 placeholder="Email"
                 className="reservation-input"
-                value={booking.email}
-                onChange={e => {
-                  setBooking({
-                    ...booking,
-                    email: e.target.value
-                  });
-                }}
+                name = "email"
               />
-            </Col>
+              <input type="submit" value="Book" />
+            </form>
           </Row>
           <Row noGutters className="text-center">
             <Col>
-              {/* <Button
-                color="none"
-                className="custom-btn"
-                onClick={_ => {
-                  reserve();
-                }}
-              >
-                Book Now
-              </Button> */}
               <PayPalBtn
                     amount = {200}
                     currency = {'USD'}
@@ -453,40 +440,3 @@ export default props => {
     </div>
   );
 };
-
-{/* <div id="smart-button-container">
-      <div style="text-align: center;">
-        <div id="paypal-button-container"></div>
-      </div>
-    </div>
-  <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD" data-sdk-integration-source="button-factory"></script>
-  <script>
-    function initPayPalButton() {
-      paypal.Buttons({
-        style: {
-          shape: 'rect',
-          color: 'gold',
-          layout: 'vertical',
-          label: 'pay',
-          
-        },
-
-        createOrder: function(data, actions) {
-          return actions.order.create({
-            purchase_units: [{"amount":{"currency_code":"USD","value":0.01}}]
-          });
-        },
-
-        onApprove: function(data, actions) {
-          return actions.order.capture().then(function(details) {
-            alert('Transaction completed by ' + details.payer.name.given_name + '!');
-          });
-        },
-
-        onError: function(err) {
-          console.log(err);
-        }
-      }).render('#paypal-button-container');
-    }
-    initPayPalButton();
-  </script> */}
