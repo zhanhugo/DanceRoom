@@ -1,4 +1,4 @@
-import React, { Component, useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Row,
   Col,
@@ -9,13 +9,17 @@ import {
   Input,
   Button
 } from "reactstrap";
-import PayPalBtn from './paypal';
+
+import { PayPalButton } from "react-paypal-button-v2";
 
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+
 import emailjs from "emailjs-com"; 
 
 export default props => {
+const formRef = useRef(null);
+
   // User's selections
   const [selection, setSelection] = useState({
     date: getToday(),
@@ -49,6 +53,9 @@ export default props => {
   // Basic reservation "validation"
   const [reservationError, setReservationError] = useState(false);
 
+  // Button state
+  const[pay, setPay] = useState(false)
+
   useEffect(() => {
     if (selection.duration && selection.date && selection.size && selection.location) {
       (async _ => {
@@ -70,27 +77,39 @@ export default props => {
     return timestamp
   }
 
-  function sendEmail(e) {
-    e.preventDefault();
-    console.log(e.target.email.value)
-    
+  function sendForm() {
+    formRef.current.dispatchEvent(new Event('submit'));
+  }
 
-    e.target.reset()
+  function checkField() {
+    if (
+      (formRef.current.name.value.length === 0) |
+      (formRef.current.phone.value.length === 0) |
+      (formRef.current.email.value.length === 0)
+    ) {
+      setReservationError(true);
+    } else {
+      setPay(true);
+    }
   }
 
   // Make the reservation if all details are filled out
   async function reserve(e) {
     e.preventDefault();
-    console.log(e.target.phone.value.type)
-    if (
-      (e.target.name.value.length === 0) |
-      (e.target.phone.value.length === 0) |
-      (e.target.email.value.length === 0)
-    ) {
-      console.log("Incomplete Details");
-      setReservationError(true);
-    } else {
-      let res = await fetch("http://localhost:3001/days", {
+    await fetch("http://localhost:3001/days", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        date: selection.date,
+        size: selection.size, 
+        duration: selection.duration, 
+        start: selection.time
+      })
+    }).then(props.setPage(2))
+    .then( 
+      await fetch("http://localhost:3001/reserves", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -99,45 +118,29 @@ export default props => {
           date: selection.date,
           size: selection.size, 
           duration: selection.duration, 
-          start: selection.time
+          start: selection.time,
+          name: e.target.name.value,
+          phone: e.target.phone.value,
+          email: e.target.email.value
         })
-      }).then(props.setPage(2))
-      .then( 
-        await fetch("http://localhost:3001/reserves", {
-          method: "POST",
+      }).then(
+        await fetch('http://localhost:3001/sms', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json"
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            date: selection.date,
-            size: selection.size, 
-            duration: selection.duration, 
-            start: selection.time,
-            name: e.target.name.value,
-            phone: e.target.phone.value,
-            email: e.target.email.value
+            to: e.target.phone.value,
+            body: getReservations()
           })
         }).then(
-          await fetch('http://localhost:3001/sms', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              to: e.target.phone.value,
-              body: getReservations()
+          emailjs.sendForm('service_m09cymo', 'template_8j4kqwe', e.target, 'user_1CbHyIpDtnS95rYhItSCi')
+            .then((error) => {
+                console.log(error.text);
             })
-          }).then(
-            emailjs.sendForm('service_m09cymo', 'template_8j4kqwe', e.target, 'user_1CbHyIpDtnS95rYhItSCi')
-              .then((result) => {
-                  console.log(result.text);
-              }, (error) => {
-                  console.log(error.text);
-              })
-          )
         )
-      ); 
-    }
+      )
+    ); 
   };
 
   // Generate party size dropdown
@@ -353,7 +356,7 @@ export default props => {
           <Row noGutters className="times-display">
             <Col>
               {selection.location && selection.date && selection.duration && (selection.plan === "Pay by Hour" || selection.size) ? (
-                selection.location === "Upstairs" && times.length > 0 && times[0] != 0 ? (
+                selection.location === "Upstairs" && times.length > 0 && times[0] !== 0 ? (
                   <div>
                     <p className="time-display-message">
                       Select a Starting Time
@@ -390,49 +393,69 @@ export default props => {
         </div>
       ) : (
         <div id="confirm-reservation-stuff">
-          <Row
+          
+          <form ref={formRef} onSubmit={reserve}>
+            <Input
+              className="selected-time"
+              type="hidden"
+              name="message"
+              value={getReservations()}
+            />
+            <Row
             noGutters
             className="text-center justify-content-center reservation-details-container"
-          >
-            <form className = "reservation-details" onSubmit = {reserve}>
-              <Input
-                className = "selected-time"
-                type = "hidden"
-                name = "message"
-                value = {getReservations()}
-              />
-              <Input
-                type="text"
-                bsSize="lg"
-                placeholder="Name"
-                className="reservation-input"
-                name = "name"
-              />
-              <Input
-                type="text"
-                bsSize="lg"
-                placeholder="Phone Number"
-                className="reservation-input"
-                name = "phone"
-              />
-              <Input
-                type="text"
-                bsSize="lg"
-                placeholder="Email"
-                className="reservation-input"
-                name = "email"
-              />
-              <input type="submit" value="Book" />
-            </form>
-          </Row>
+            >
+              <Col xs="12" sm="3" className="reservation-details">
+                <Input
+                  type="text"
+                  bsSize="lg"
+                  placeholder="Name"
+                  className="reservation-input"
+                  name="name"
+                />
+              </Col>
+              <Col xs="12" sm="3" className="reservation-details">
+                <Input
+                  type="text"
+                  bsSize="lg"
+                  placeholder="Phone Number"
+                  className="reservation-input"
+                  name="phone"
+                />
+              </Col>
+              <Col xs="12" sm="3" className="reservation-details">
+                <Input
+                  type="text"
+                  bsSize="lg"
+                  placeholder="Email"
+                  className="reservation-input"
+                  name="email"
+                />
+              </Col>
+            </Row>
+          </form>
           <Row noGutters className="text-center">
             <Col>
-              <PayPalBtn
-                    amount = {200}
-                    currency = {'USD'}
-                    onSuccess={_ => {
-                      reserve();
-                    }}/>
+              {!pay ? 
+                <Button
+                  color="none"
+                  className="custom-btn"
+                  onClick={_ => {
+                    checkField();
+                  }}
+                >
+                  Book Now
+                </Button> :
+                <PayPalButton
+                  amount={0.01}
+                  currency={'USD'}
+                  onSuccess={_ => {
+                    sendForm();
+                  }}
+                  options={{
+                    clientId: "sb"
+                  }}/>
+                }
             </Col>
           </Row>
         </div>
